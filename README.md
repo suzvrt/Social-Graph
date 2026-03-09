@@ -1,0 +1,1 @@
+Software desenvolvido por Enzo Suzart Pinto, aluno do Polo Saquarema do curso de Tecnologia em Sistemas da Computação oferecido pela Fundação CECIERJ/Consórcio CEDERJ em função da 2ª Avaliação Distancial da disciplina Programação com Interfaces Gráficas no segundo semestre de 2019.
