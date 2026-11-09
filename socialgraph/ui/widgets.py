@@ -31,14 +31,13 @@ class Accordion(tk.Frame):
         for title, body in topics:
             header = tk.Button(self, text="○ %s:" % title, font=(FONT_FAMILY, 9, "bold"), borderwidth=0)
             header.pack(anchor=tk.NW)
-            label = tk.Label(self, text="", wraplength=wraplength, justify=tk.LEFT)
-            label.pack(anchor=tk.NW)
-            header.configure(command=lambda lbl=label, text=body: self._toggle(lbl, text))
+            label = tk.Label(self, text=body, wraplength=wraplength, justify=tk.LEFT)
+            header.configure(command=lambda h=header, lbl=label: self._toggle(h, lbl))
             self._bodies.append(label)
 
-    def _toggle(self, label, body):
-        was_open = bool(label.cget("text"))
+    def _toggle(self, header, label):
+        was_open = label.winfo_manager() == "pack"
         for other in self._bodies:
-            other.configure(text="")
+            other.pack_forget()
         if not was_open:
-            label.configure(text=body + "\n")
+            label.pack(after=header, anchor=tk.NW, pady=(0, 8))
