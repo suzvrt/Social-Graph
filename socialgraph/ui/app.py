@@ -9,9 +9,10 @@ from tkinter import filedialog, messagebox, simpledialog
 
 from socialgraph.config import APP_NAME
 from socialgraph.model import graph_io
+from socialgraph.model.names import name_error, normalize_name
 from socialgraph.model.social_graph import BY_DISTANCE, BY_WEIGHTED_DISTANCE, recommend_friends
 from socialgraph.theme import DARK
-from socialgraph.ui.dialogs import InfoDialog, RecommendationsPopup, UnsavedChangesDialog, ask_weight
+from socialgraph.ui.dialogs import InfoDialog, RecommendationsPopup, UnsavedChangesDialog, ask_weight, clamp_weight
 from socialgraph.ui.graph_canvas import GraphCanvas, PlacementError
 from socialgraph.ui.widgets import center_window, set_icon
 
@@ -27,7 +28,8 @@ class SocialGraphApp(tk.Tk):
         set_icon(self)
         self.geometry("%dx%d" % (self.winfo_screenwidth() // 2, self.winfo_screenheight() // 2))
         self.dirty = False
-        self.canvas = GraphCanvas(self, DARK, on_change=self._on_graph_changed)
+        self.canvas = GraphCanvas(self, DARK, on_change=self._on_graph_changed,
+                                  on_recommend=self.show_recommendations)
         self.canvas.pack(expand=True, fill=tk.BOTH)
         self._build_menu()
 
@@ -101,31 +103,37 @@ class SocialGraphApp(tk.Tk):
             messagebox.showwarning("Erro!", error)
 
     def export_graph(self):
+        """Save the graph to a user-chosen file. Return True only if it was written."""
         if self.graph.num_vertices() == 0:
             messagebox.showwarning("Grafo vazio!", "O grafo atual está vazio.")
-            return
-        path = filedialog.asksaveasfilename(filetypes=FILE_TYPES)
+            return False
+        path = filedialog.asksaveasfilename(filetypes=FILE_TYPES, defaultextension=".txt")
         if not path:
-            return
-        if not path.endswith(".txt"):
-            path += ".txt" if not os.path.isfile(path + ".txt") else " (1).txt"
-        graph_io.save_graph(self.graph, path)
+            return False
+        try:
+            graph_io.save_graph(self.graph, path)
+        except OSError as error:
+            messagebox.showerror("Erro!", "Não foi possível salvar o arquivo:\n%s" % error)
+            return False
         self._set_file_title(path)
         self.dirty = False
+        return True
 
     # Graph editing
 
     def add_vertex(self):
-        name = simpledialog.askstring("Criar vértice", "Insira o nome:")
-        if not name:
+        raw = simpledialog.askstring("Criar vértice", "Insira o nome:")
+        if raw is None:
             return
-        if self.graph.has_vertex(name):
+        name = normalize_name(raw)
+        error = name_error(name)
+        if error:
+            messagebox.showwarning("Atenção!", error)
+        elif self.graph.has_vertex(name):
             messagebox.showwarning("Atenção!", "O grafo já possui um vértice %s." % name)
-        elif not name.isalpha():
-            messagebox.showwarning("Atenção!", "Números e símbolos não permitidos.")
         else:
             try:
-                self.canvas.add_node(name.capitalize())
+                self.canvas.add_node(name)
             except PlacementError as error:
                 messagebox.showwarning("Atenção!", error)
                 return
@@ -155,28 +163,29 @@ class SocialGraphApp(tk.Tk):
         else:
             messagebox.showwarning("Aviso!", "Não existe um caminho entre os dois vértices selecionados.")
 
-    def show_recommendations(self, option):
-        selection = self.canvas.selection
-        if len(selection) > 1:
-            messagebox.showwarning("Atenção!", "Selecione apenas um vértice")
-        if not selection:
-            messagebox.showwarning("Atenção!", "Selecione um vértice para obter recomendações.")
-            return
-        top_k = simpledialog.askinteger("Recomendações", "Insira o número de recomendações:")
+    def show_recommendations(self, option, person=None):
+        """Show recommendations for person, or for the single selected vertex if person is None."""
+        if person is None:
+            if len(self.canvas.selection) != 1:
+                messagebox.showwarning("Atenção!", "Selecione um único vértice para obter recomendações.")
+                return
+            person = self.canvas.selection[0]
+        top_k = simpledialog.askinteger("Recomendações", "Insira o número de recomendações:", minvalue=1)
         if top_k is None:
             return
-        recommended = recommend_friends(self.graph, selection[0], option, top_k)
+        recommended = recommend_friends(self.graph, person, option, top_k)
         if recommended:
-            RecommendationsPopup(self, selection[0], recommended)
+            RecommendationsPopup(self, person, recommended)
         else:
             messagebox.showwarning("Aviso!", "Não há sugestões disponíveis.")
 
-    def add_recommended_edge(self, src, dst, cost):
+    def add_recommended_edge(self, src, dst, score):
+        """Follow a recommendation. The score can exceed the weight range, so it is clamped."""
         if self.graph.has_edge(src, dst):
             messagebox.showwarning("Atenção!", "Aresta já adicionada.")
             return
-        self.canvas.add_edge(src, dst, cost)
-        self.dirty = True
+        if self.canvas.add_edge(src, dst, clamp_weight(score)):
+            self.dirty = True
 
 
 def main():

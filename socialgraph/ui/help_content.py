@@ -15,7 +15,7 @@ HOW_TO = [
      " seguinte, marcado em roxo, será o vértice de destino."),
     ("Adicionar uma aresta",
      "Com os dois vértices desejados marcados, abra o menu 'Criar...' na barra superior, selecione 'Aresta',"
-     " então insira o peso desejado (de 0 até 5)."),
+     " então insira o peso desejado (de 1 até 5)."),
     ("Deletar um vértice",
      "Aperte com o botão direito no vértice desejado e então selecione 'Deletar' no menu."),
     ("Alterar o peso de uma aresta",

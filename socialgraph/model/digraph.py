@@ -3,29 +3,22 @@
 @author: Enzo Suzart Pinto
 """
 
+import heapq
+from typing import NamedTuple
 
-class Edge:
-    """A weighted link to a target vertex, as stored in an adjacency set."""
 
-    def __init__(self, vertex, cost):
-        self.vertex = vertex
-        self.cost = cost
+class Edge(NamedTuple):
+    """A weighted link to `vertex`. Immutable, so it is safe to keep in sets."""
 
-    def __hash__(self):
-        return hash((self.vertex, self.cost))
-
-    def __eq__(self, other):
-        return isinstance(other, Edge) and (self.vertex, self.cost) == (other.vertex, other.cost)
-
-    def __lt__(self, other):
-        return self.cost < other.cost
+    vertex: str
+    cost: float
 
     def __repr__(self):
         return "<%s, %s>" % (self.vertex, self.cost)
 
 
 class DiGraph:
-    """Directed graph mapping each vertex to the set of its outgoing edges."""
+    """Directed graph stored as an adjacency map: {src: {dst: cost}}."""
 
     def __init__(self):
         self._adj = {}
@@ -33,27 +26,20 @@ class DiGraph:
     def has_vertex(self, vertex):
         return vertex in self._adj
 
+    def has_edge(self, src, dst):
+        return dst in self._adj.get(src, {})
+
     def get_edge(self, src, dst):
         """Return the edge from src to dst, or None if it does not exist."""
-        if self.has_vertex(src) and self.has_vertex(dst):
-            for edge in self._adj[src]:
-                if edge.vertex == dst:
-                    return edge
-        return None
-
-    def has_edge(self, src, dst):
-        if self.has_vertex(src) and self.has_vertex(dst):
-            if self.get_edge(src, dst) is not None:
-                return True
-        else:
-            return False
+        cost = self._adj.get(src, {}).get(dst)
+        return None if cost is None else Edge(dst, cost)
 
     def add_vertex(self, vertex):
         """Add an isolated vertex. Return False if it is None or already present."""
-        if vertex is not None and not self.has_vertex(vertex):
-            self._adj[vertex] = set()
-            return True
-        return False
+        if vertex is None or self.has_vertex(vertex):
+            return False
+        self._adj[vertex] = {}
+        return True
 
     def add_edge(self, src, dst, cost=1):
         """Add src -> dst (creating missing vertices) or update its cost if it already exists."""
@@ -61,113 +47,73 @@ class DiGraph:
             return False
         self.add_vertex(src)
         self.add_vertex(dst)
-        if not self.has_edge(src, dst):
-            self._adj[src].add(Edge(dst, cost))
-        else:
-            for edge in self._adj[src]:
-                if edge.vertex == dst:
-                    edge.cost = cost
+        self._adj[src][dst] = cost
         return True
 
     def remove_vertex(self, vertex):
-        """Remove a vertex and the edges pointing to it."""
-        if self.has_vertex(vertex):
-            self._adj.pop(vertex)
-            for edges in self._adj.values():
-                for edge in edges:
-                    if vertex in edge.vertex:
-                        edges.discard(edge)
-                        break
-            return True
-        return False
+        """Remove a vertex together with its outgoing and incoming edges."""
+        if not self.has_vertex(vertex):
+            return False
+        del self._adj[vertex]
+        for targets in self._adj.values():
+            targets.pop(vertex, None)
+        return True
 
     def num_vertices(self):
         return len(self._adj)
 
     def num_edges(self):
-        return sum(len(edges) for edges in self._adj.values())
+        return sum(len(targets) for targets in self._adj.values())
 
     def vertices(self):
         return list(self._adj)
 
     def edges(self):
         """Return every edge as a (src, cost, dst) tuple."""
-        return [(src, edge.cost, edge.vertex) for src, edges in self._adj.items() for edge in edges]
+        return [(src, cost, dst) for src, targets in self._adj.items() for dst, cost in targets.items()]
 
     def adjacent_to(self, vertex):
         """Return the outgoing edges of a vertex."""
-        if vertex is not None and self.has_vertex(vertex):
-            # Rebuilt element by element so edges whose cost changed are re-hashed.
-            return {edge for edge in self._adj[vertex]}
-        return set()
+        return {Edge(dst, cost) for dst, cost in self._adj.get(vertex, {}).items()}
 
     def incoming_edges(self, vertex):
         """Return edges pointing to vertex, each labelled with its source vertex."""
-        incoming = set()
-        if vertex is not None and self.has_vertex(vertex):
-            for node in self._adj:
-                if self.has_edge(node, vertex):
-                    incoming.add(Edge(node, self.get_edge(node, vertex).cost))
-        return incoming
+        return {Edge(src, targets[vertex]) for src, targets in self._adj.items() if vertex in targets}
 
     def dijkstra(self, source):
         """Single-source shortest paths.
 
-        Return (distances, predecessors): a set of Edge(vertex, distance) for every reachable
-        vertex and a dict mapping each vertex to the Edge of its predecessor on the path.
+        Return (distances, predecessors) as dicts keyed by vertex, containing only
+        vertices reachable from source. Both are empty if source is not in the graph.
         """
-        dist = set()
-        predecessor = {}
-        queue = self.vertices()
-
-        for vertex in self.vertices():
-            dist.add(Edge(vertex, float("inf")))
-            predecessor[vertex] = None
-        self._find(dist, source).cost = 0
-
-        while queue:
-            u = None
-            for vertex in self._adj:
-                if vertex in queue:
-                    if u is None or self._find(dist, u).cost > self._find(dist, vertex).cost:
-                        u = vertex
-            if u is None:
-                break
-            queue.remove(u)
-            for adjacent in self.adjacent_to(u):
-                if adjacent.vertex in queue:
-                    alt = self._find(dist, u).cost + adjacent.cost
-                    if alt < self._find(dist, adjacent.vertex).cost:
-                        # Remove before mutating: the cost is part of the Edge hash.
-                        temp = self._find(dist, adjacent.vertex)
-                        dist.remove(temp)
-                        temp.cost = alt
-                        dist.add(temp)
-                        predecessor[adjacent.vertex] = self._find(dist, u)
-
-        reachable = {edge for edge in dist if edge.cost != float("inf")}
-        return reachable, predecessor
+        if not self.has_vertex(source):
+            return {}, {}
+        distances = {source: 0}
+        predecessors = {}
+        visited = set()
+        heap = [(0, source)]
+        while heap:
+            dist, u = heapq.heappop(heap)
+            if u in visited:
+                continue
+            visited.add(u)
+            for v, cost in self._adj[u].items():
+                alt = dist + cost
+                if v not in distances or alt < distances[v]:
+                    distances[v] = alt
+                    predecessors[v] = u
+                    heapq.heappush(heap, (alt, v))
+        return distances, predecessors
 
     def shortest_path(self, source, dest):
         """Return the vertices on the cheapest path from source to dest, or [] if unreachable."""
-        path = []
-        if source is not None and dest is not None and self.has_vertex(source) and self.has_vertex(dest):
-            shortest, predecessor = self.dijkstra(source)
-            target = self._find(shortest, dest)
-            if target is not None and target.cost < float("inf"):
-                current = dest
-                while current != source:
-                    path.insert(0, predecessor[current].vertex)
-                    current = predecessor[current].vertex
-                path.append(dest)
+        distances, predecessors = self.dijkstra(source)
+        if dest not in distances:
+            return []
+        path = [dest]
+        while path[0] != source:
+            path.insert(0, predecessors[path[0]])
         return path
-
-    @staticmethod
-    def _find(edge_set, vertex):
-        for edge in edge_set:
-            if edge.vertex == vertex:
-                return edge
-        return None
 
     def __repr__(self):
         return "Vertices: %s\nEdges: %s" % (self.vertices(), " ".join(str(e) for e in self.edges()))
