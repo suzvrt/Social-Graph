@@ -3,6 +3,7 @@
 import tkinter as tk
 from tkinter import simpledialog, ttk
 
+from socialgraph import __version__
 from socialgraph.config import APP_NAME, FONT_FAMILY, MAX_WEIGHT, MIN_WEIGHT
 from socialgraph.ui import help_content
 from socialgraph.ui.widgets import Accordion, center_window, set_icon
@@ -84,14 +85,14 @@ class InfoDialog(tk.Toplevel):
         notebook.pack(expand=True, fill=tk.BOTH)
         ttk.Button(self, text="Fechar", command=self.destroy).pack(anchor=tk.S)
 
-        manual = self._add_tab(notebook, "Como usar")
-        Accordion(manual, help_content.HOW_TO, wrap).pack(anchor=tk.NW, fill=tk.X)
+        for title, topics in help_content.TABS:
+            tab = self._add_tab(notebook, title)
+            Accordion(tab, topics, wrap).pack(anchor=tk.NW, fill=tk.X)
 
-        more = self._add_tab(notebook, "Mais")
-        Accordion(more, help_content.MORE, wrap).pack(anchor=tk.NW, fill=tk.X)
-        tk.Label(more, text="__________________________________").pack(anchor=tk.S)
-        tk.Label(more, text="Sobre o projeto", font=(FONT_FAMILY, 10, "bold")).pack(anchor=tk.S)
-        tk.Label(more, text=help_content.ABOUT, wraplength=wrap, justify=tk.LEFT).pack(anchor=tk.S)
+        tk.Label(tab, text="__________________________________").pack(anchor=tk.S)
+        tk.Label(tab, text="Sobre o projeto (versão %s)" % __version__,
+                 font=(FONT_FAMILY, 10, "bold")).pack(anchor=tk.S)
+        tk.Label(tab, text=help_content.ABOUT, wraplength=wrap, justify=tk.LEFT).pack(anchor=tk.S)
 
         self.grab_set()
         self.focus_set()

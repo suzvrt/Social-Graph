@@ -18,6 +18,15 @@ Testes da camada de modelo:
 python -m unittest discover tests
 ```
 
+## Funcionalidades
+
+- Criar, mover e deletar vértices; criar, alterar o peso e excluir arestas.
+- Importar/exportar grafos em `.txt`, com aviso de alterações não salvas.
+- Menor caminho (Dijkstra) e recomendações de amizade por distância ou distância ponderada.
+- Posicionamento automático ao importar; arestas desviam de vértices e arestas opostas não se sobrepõem.
+- Temas escuro e claro (menu `Exibir > Tema`), lembrados entre execuções em `~/.socialgraph.json`.
+- Instruções completas no menu `Informações`.
+
 ## Formato de arquivo
 
 Arquivos `.txt` com um comando por linha:
@@ -34,10 +43,12 @@ Veja [infile.txt](infile.txt) como exemplo.
 
 ```
 socialgraph/
-  config.py        constantes (raio do vértice, faixa de pesos, caminhos)
+  config.py        constantes (raio do vértice, faixa de pesos, roteamento, caminhos)
   theme.py         paletas de cores
-  model/           grafo, recomendações e leitura/escrita de arquivos (sem Tkinter)
-  ui/              janela principal, canvas, diálogos e textos de ajuda
+  settings.py      preferências do usuário
+  model/           grafo, recomendações, nomes e leitura/escrita de arquivos (sem Tkinter)
+  ui/              janela principal, canvas, geometria, diálogos e textos de ajuda
+tests/             testes unitários (unittest)
 ```
 
 ## Sobre
