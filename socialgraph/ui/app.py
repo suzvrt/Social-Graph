@@ -20,18 +20,23 @@ FILE_TYPES = [("Arquivos de texto (*.txt)", "*.txt")]
 
 
 class SocialGraphApp(tk.Tk):
-    """Top-level window. `dirty` is True while there are changes not yet exported."""
+    """Top-level window.
+
+    `dirty` is True while there are changes not yet exported. Every graph mutation
+    must go through mark_dirty() so the unsaved-changes prompt stays reliable.
+    """
 
     def __init__(self):
         super().__init__()
-        self.title(APP_NAME)
         set_icon(self)
         self.geometry("%dx%d" % (self.winfo_screenwidth() // 2, self.winfo_screenheight() // 2))
         self.dirty = False
-        self.canvas = GraphCanvas(self, DARK, on_change=self._on_graph_changed,
-                                  on_recommend=self.show_recommendations)
+        self.file_name = None
+        self.canvas = GraphCanvas(self, DARK, on_change=self.mark_dirty, on_recommend=self.show_recommendations)
         self.canvas.pack(expand=True, fill=tk.BOTH)
         self._build_menu()
+        self._update_title()
+        self.protocol("WM_DELETE_WINDOW", lambda: self._run_discarding_changes(self.destroy))
 
     @property
     def graph(self):
@@ -62,11 +67,19 @@ class SocialGraphApp(tk.Tk):
         menubar.add_command(label="Informações", command=lambda: InfoDialog(self))
         self.configure(menu=menubar)
 
-    def _on_graph_changed(self):
+    def mark_dirty(self):
         self.dirty = True
+        self._update_title()
 
-    def _set_file_title(self, path):
-        self.title("%s - %s" % (os.path.splitext(os.path.basename(path))[0], APP_NAME))
+    def mark_clean(self, path=None):
+        """Record that the graph matches a file on disk (or is a fresh, empty graph)."""
+        self.dirty = False
+        self.file_name = os.path.splitext(os.path.basename(path))[0] if path else None
+        self._update_title()
+
+    def _update_title(self):
+        title = "%s - %s" % (self.file_name, APP_NAME) if self.file_name else APP_NAME
+        self.title(("*" if self.dirty else "") + title)
 
     def _run_discarding_changes(self, action):
         """Run action right away, or after the user decides what to do with unsaved changes."""
@@ -82,7 +95,7 @@ class SocialGraphApp(tk.Tk):
 
     def _reset(self):
         self.canvas.clear()
-        self.title(APP_NAME)
+        self.mark_clean()
 
     def import_graph(self):
         self._run_discarding_changes(self._choose_and_load)
@@ -91,16 +104,20 @@ class SocialGraphApp(tk.Tk):
         path = filedialog.askopenfilename(filetypes=FILE_TYPES)
         if not path:
             return
-        self._reset()
         try:
             graph = graph_io.load_graph(path)
             if graph.num_vertices() == 0:
                 raise ValueError("O arquivo não gera um grafo.")
+        except (OSError, ValueError) as error:
+            messagebox.showwarning("Erro!", error)
+            return
+        try:
             self.canvas.load_graph(graph)
-            self._set_file_title(path)
-        except Exception as error:
+        except PlacementError as error:
             self._reset()
             messagebox.showwarning("Erro!", error)
+            return
+        self.mark_clean(path)
 
     def export_graph(self):
         """Save the graph to a user-chosen file. Return True only if it was written."""
@@ -115,8 +132,7 @@ class SocialGraphApp(tk.Tk):
         except OSError as error:
             messagebox.showerror("Erro!", "Não foi possível salvar o arquivo:\n%s" % error)
             return False
-        self._set_file_title(path)
-        self.dirty = False
+        self.mark_clean(path)
         return True
 
     # Graph editing
@@ -137,7 +153,7 @@ class SocialGraphApp(tk.Tk):
             except PlacementError as error:
                 messagebox.showwarning("Atenção!", error)
                 return
-            self.dirty = True
+            self.mark_dirty()
 
     def connect_selected(self):
         if len(self.canvas.selection) < 2:
@@ -149,9 +165,8 @@ class SocialGraphApp(tk.Tk):
                                                " acesse 'Informações'\npara saber como.")
             return
         cost = ask_weight("Nova aresta", "Insira o peso da aresta:")
-        if cost is not None:
-            self.canvas.add_edge(src, dst, cost)
-            self.dirty = True
+        if cost is not None and self.canvas.add_edge(src, dst, cost):
+            self.mark_dirty()
 
     def show_shortest_path(self):
         if len(self.canvas.selection) < 2:
@@ -185,7 +200,7 @@ class SocialGraphApp(tk.Tk):
             messagebox.showwarning("Atenção!", "Aresta já adicionada.")
             return
         if self.canvas.add_edge(src, dst, clamp_weight(score)):
-            self.dirty = True
+            self.mark_dirty()
 
 
 def main():

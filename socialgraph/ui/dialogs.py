@@ -38,9 +38,9 @@ class UnsavedChangesDialog(tk.Toplevel):
         self.focus_set()
 
     def save_and_continue(self):
-        self.app.export_graph()
-        self.app.dirty = False
-        self.discard_and_continue()
+        # Stay open if the user cancels the save dialog, so the changes are not lost silently.
+        if self.app.export_graph():
+            self.discard_and_continue()
 
     def discard_and_continue(self):
         self.destroy()
