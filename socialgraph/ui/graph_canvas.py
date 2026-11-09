@@ -4,11 +4,12 @@ import tkinter as tk
 from random import randint
 from tkinter import messagebox
 
-from socialgraph.config import MAX_PLACEMENT_TRIES, NODE_RADIUS, PATH_HIGHLIGHT_MS
+from socialgraph.config import EDGE_CLEARANCE, MAX_PLACEMENT_TRIES, NODE_RADIUS, PATH_HIGHLIGHT_MS
 from socialgraph.model.digraph import DiGraph
 from socialgraph.model.social_graph import BY_DISTANCE, BY_WEIGHTED_DISTANCE
 from socialgraph.ui.dialogs import ask_weight
 from socialgraph.ui.edge_view import EdgeView
+from socialgraph.ui.geometry import force_layout, route_distance, route_edge
 from socialgraph.ui.node_view import NodeView
 
 
@@ -41,40 +42,40 @@ class GraphCanvas(tk.Canvas):
         self.delete("all")
 
     def load_graph(self, graph):
-        """Replace the current drawing with graph, placing its vertices randomly."""
+        """Replace the current drawing with graph, positioned by a force-directed layout."""
         self.clear()
-        for vertex in graph.vertices():
-            self.add_node(vertex)
+        margin = NODE_RADIUS + 5
+        positions = force_layout(graph.vertices(), [(src, dst) for src, _, dst in graph.edges()],
+                                 self.winfo_width(), self.winfo_height(), margin, min_distance=3 * NODE_RADIUS)
+        for vertex, position in positions.items():
+            self._create_node(vertex, *position)
         for src, cost, dst in graph.edges():
-            self.add_edge(src, dst, cost)
+            self._create_edge(src, dst, cost)
+        self._reroute_edges()
 
     def add_node(self, name):
+        """Add a vertex at a random free spot. Raise PlacementError if the canvas is full."""
         if self.graph.has_vertex(name):
             return
-        x, y = self._find_free_spot()
-        self.graph.add_vertex(name)
-        view = NodeView(self, name, x, y, self.theme)
-        view.bind("<Button-3>", lambda e: self._show_node_menu(e, name))
-        view.bind("<B1-Motion>", lambda e: self._drag_node(e, name))
-        view.bind("<Control-1>", lambda e: self.toggle_selection(name))
-        self.nodes[name] = view
+        self._create_node(name, *self._find_free_spot())
+        self._reroute_edges()
 
     def add_edge(self, src, dst, cost):
         """Create src -> dst, or update its weight if it exists. Return False if the model rejects it."""
-        if not self.graph.add_edge(src, dst, cost):
-            return False
         if (src, dst) in self.edges:
+            if not self.graph.add_edge(src, dst, cost):
+                return False
             self.edges[(src, dst)].set_cost(cost)
             return True
-        view = EdgeView(self, self.nodes[src], self.nodes[dst], cost, self.theme)
-        view.bind("<Double-Button-1>", lambda e: self._change_weight(src, dst))
-        view.bind("<Button-3>", lambda e: self._show_edge_menu(e, src, dst))
-        self.edges[(src, dst)] = view
+        if not self._create_edge(src, dst, cost):
+            return False
+        self._reroute_edges()
         return True
 
     def delete_edge(self, src, dst):
         if self.graph.remove_edge(src, dst):
             self.edges.pop((src, dst)).delete()
+            self._reroute_edges()
 
     def delete_node(self, name):
         self.graph.remove_vertex(name)
@@ -84,12 +85,47 @@ class GraphCanvas(tk.Canvas):
         if name in self.selection:
             self.selection.remove(name)
             self._restyle_selection()
+        self._reroute_edges()
 
     def move_node(self, name, x, y):
-        self.nodes[name].move_to(x, y)
+        view = self.nodes[name]
+        old = (view.x, view.y)
+        view.move_to(x, y)
+        # Only edges touching the vertex, passing near its old or new spot, or already
+        # bent around something can change; this keeps dragging smooth on larger graphs.
+        reach = NODE_RADIUS + EDGE_CLEARANCE
+        for (src, dst), edge in self.edges.items():
+            if (name in (src, dst) or edge.route.curved
+                    or route_distance(edge.route, old) < reach or route_distance(edge.route, (x, y)) < reach):
+                edge.redraw(self._route(src, dst))
+
+    def _create_node(self, name, x, y):
+        self.graph.add_vertex(name)
+        view = NodeView(self, name, x, y, self.theme)
+        view.bind("<Button-3>", lambda e: self._show_node_menu(e, name))
+        view.bind("<B1-Motion>", lambda e: self._drag_node(e, name))
+        view.bind("<Control-1>", lambda e: self.toggle_selection(name))
+        self.nodes[name] = view
+
+    def _create_edge(self, src, dst, cost):
+        if not self.graph.add_edge(src, dst, cost):
+            return False
+        view = EdgeView(self, cost, self.theme, self._route(src, dst))
+        view.bind("<Double-Button-1>", lambda e: self._change_weight(src, dst))
+        view.bind("<Button-3>", lambda e: self._show_edge_menu(e, src, dst))
+        self.edges[(src, dst)] = view
+        return True
+
+    def _route(self, src, dst):
+        a, b = self.nodes[src], self.nodes[dst]
+        obstacles = [(n.x, n.y) for name, n in self.nodes.items() if name not in (src, dst)]
+        return route_edge((a.x, a.y), (b.x, b.y), NODE_RADIUS, obstacles, self.graph.has_edge(dst, src))
+
+    def _reroute_edges(self):
+        # Any change can open or block another edge's path (or create/remove its reverse
+        # edge), so every edge is rerouted. Fine for the graph sizes this app targets.
         for (src, dst), view in self.edges.items():
-            if name in (src, dst):
-                view.redraw()
+            view.redraw(self._route(src, dst))
 
     def toggle_selection(self, name):
         """Ctrl+click: select a vertex, or unselect it if it was already selected.

@@ -111,12 +111,7 @@ class SocialGraphApp(tk.Tk):
         except (OSError, ValueError) as error:
             messagebox.showwarning("Erro!", error)
             return
-        try:
-            self.canvas.load_graph(graph)
-        except PlacementError as error:
-            self._reset()
-            messagebox.showwarning("Erro!", error)
-            return
+        self.canvas.load_graph(graph)
         self.mark_clean(path)
 
     def export_graph(self):
