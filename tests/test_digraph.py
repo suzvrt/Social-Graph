@@ -54,6 +54,17 @@ class EdgeTests(unittest.TestCase):
         self.assertIn(Edge("B", 2), graph.adjacent_to("A"))
         self.assertIn(Edge("A", 2), graph.incoming_edges("B"))
 
+    def test_remove_edge_keeps_vertices_and_reverse_edge(self):
+        graph = DiGraph()
+        graph.add_edge("A", "B", 1)
+        graph.add_edge("B", "A", 2)
+        self.assertTrue(graph.remove_edge("A", "B"))
+        self.assertFalse(graph.has_edge("A", "B"))
+        self.assertTrue(graph.has_edge("B", "A"))
+        self.assertCountEqual(graph.vertices(), ["A", "B"])
+        self.assertFalse(graph.remove_edge("A", "B"))
+        self.assertFalse(graph.remove_edge("A", "Ghost"))
+
     def test_has_edge_is_always_a_bool(self):
         graph = DiGraph()
         graph.add_edge("A", "B", 1)
