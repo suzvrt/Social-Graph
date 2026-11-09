@@ -43,5 +43,8 @@ class NodeView:
     def set_outline(self, outline):
         self.canvas.itemconfigure(self.circle, outline=outline)
 
+    def set_text_color(self, color):
+        self.canvas.itemconfigure(self.label, fill=color)
+
     def delete(self):
         self.canvas.delete(self.tag)

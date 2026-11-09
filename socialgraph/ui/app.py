@@ -7,11 +7,12 @@ import os.path
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 
-from socialgraph.config import APP_NAME
+from socialgraph.config import APP_NAME, SETTINGS_PATH
 from socialgraph.model import graph_io
 from socialgraph.model.names import name_error, normalize_name
 from socialgraph.model.social_graph import BY_DISTANCE, BY_WEIGHTED_DISTANCE, recommend_friends
-from socialgraph.theme import DARK
+from socialgraph.settings import load_settings, save_settings
+from socialgraph.theme import THEMES, get_theme
 from socialgraph.ui.dialogs import InfoDialog, RecommendationsPopup, UnsavedChangesDialog, ask_weight, clamp_weight
 from socialgraph.ui.graph_canvas import GraphCanvas, PlacementError
 from socialgraph.ui.widgets import center_window, set_icon
@@ -26,13 +27,17 @@ class SocialGraphApp(tk.Tk):
     must go through mark_dirty() so the unsaved-changes prompt stays reliable.
     """
 
-    def __init__(self):
+    def __init__(self, settings_path=SETTINGS_PATH):
         super().__init__()
         set_icon(self)
         self.geometry("%dx%d" % (self.winfo_screenwidth() // 2, self.winfo_screenheight() // 2))
         self.dirty = False
         self.file_name = None
-        self.canvas = GraphCanvas(self, DARK, on_change=self.mark_dirty, on_recommend=self.show_recommendations)
+        self.settings_path = settings_path
+        self.settings = load_settings(settings_path)
+        theme = get_theme(self.settings.get("theme"))
+        self.theme_key = tk.StringVar(self, value=theme.key)
+        self.canvas = GraphCanvas(self, theme, on_change=self.mark_dirty, on_recommend=self.show_recommendations)
         self.canvas.pack(expand=True, fill=tk.BOTH)
         self._build_menu()
         self._update_title()
@@ -64,8 +69,24 @@ class SocialGraphApp(tk.Tk):
                              command=lambda: self.show_recommendations(BY_WEIGHTED_DISTANCE))
         menubar.add_cascade(label="Recomendações", menu=rec_menu)
 
+        view_menu = tk.Menu(menubar, tearoff=False)
+        theme_menu = tk.Menu(view_menu, tearoff=False)
+        for theme in THEMES.values():
+            theme_menu.add_radiobutton(label=theme.name, value=theme.key, variable=self.theme_key,
+                                       command=lambda key=theme.key: self.set_theme(key))
+        view_menu.add_cascade(label="Tema", menu=theme_menu)
+        menubar.add_cascade(label="Exibir", menu=view_menu)
+
         menubar.add_command(label="Informações", command=lambda: InfoDialog(self))
         self.configure(menu=menubar)
+
+    def set_theme(self, key):
+        """Switch the canvas colors and remember the choice for the next launch."""
+        theme = get_theme(key)
+        self.theme_key.set(theme.key)
+        self.canvas.apply_theme(theme)
+        self.settings["theme"] = theme.key
+        save_settings(self.settings, self.settings_path)
 
     def mark_dirty(self):
         self.dirty = True

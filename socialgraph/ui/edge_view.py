@@ -41,5 +41,10 @@ class EdgeView:
     def set_color(self, color):
         self.canvas.itemconfigure(self.line, fill=color)
 
+    def apply_theme(self, theme):
+        self.set_color(theme.edge)
+        self.canvas.itemconfigure(self.label, fill=theme.weight_text)
+        self.canvas.itemconfigure(self.label_bg, fill=theme.weight_bg)
+
     def delete(self):
         self.canvas.delete(self.tag)

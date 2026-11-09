@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class Theme:
     """Every color the canvas uses. Widgets must read colors from here, never hardcode them."""
 
+    key: str
     name: str
     canvas_bg: str
     node_fill: str
@@ -23,6 +24,7 @@ class Theme:
 
 
 DARK = Theme(
+    key="dark",
     name="Escuro",
     canvas_bg="#2b2b2b",
     node_fill="#2b2b2b",
@@ -37,3 +39,27 @@ DARK = Theme(
     weight_bg="#2b2b2b",
     path_highlight="#5c96ba",
 )
+
+LIGHT = Theme(
+    key="light",
+    name="Claro",
+    canvas_bg="#f7f7f7",
+    node_fill="#ffffff",
+    node_outline="#c25a00",
+    node_text="#2b2b2b",
+    source_fill="#e3f4d7",
+    source_outline="#3c8d0d",
+    target_fill="#ece0f7",
+    target_outline="#8e24aa",
+    edge="#6b7b8c",
+    weight_text="#b0306a",
+    weight_bg="#f7f7f7",
+    path_highlight="#1e88e5",
+)
+
+THEMES = {theme.key: theme for theme in (DARK, LIGHT)}
+
+
+def get_theme(key):
+    """Return the theme registered under key, falling back to DARK for unknown keys."""
+    return THEMES.get(key, DARK)
