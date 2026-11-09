@@ -141,6 +141,16 @@ class GraphCanvas(tk.Canvas):
                 self.selection.pop(0)
         self._restyle_selection()
 
+    def apply_theme(self, theme):
+        """Recolor every item in place; nothing is redrawn or moved."""
+        self.theme = theme
+        self.configure(bg=theme.canvas_bg)
+        for view in self.nodes.values():
+            view.set_text_color(theme.node_text)
+        for view in self.edges.values():
+            view.apply_theme(theme)
+        self._restyle_selection()
+
     def highlight_path(self, path):
         """Temporarily paint the edges and vertices of path."""
         for src, dst in zip(path, path[1:]):

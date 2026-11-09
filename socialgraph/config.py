@@ -6,6 +6,7 @@ APP_NAME = "SocialGraph"
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 ICON_PATH = PROJECT_DIR / "assets" / "icon.ico"
+SETTINGS_PATH = Path.home() / ".socialgraph.json"
 
 FONT_FAMILY = "Segoe UI"
 
