@@ -8,12 +8,14 @@ from socialgraph.ui import help_content
 from socialgraph.ui.widgets import Accordion, center_window, set_icon
 
 
+def clamp_weight(cost):
+    return max(MIN_WEIGHT, min(MAX_WEIGHT, int(cost)))
+
+
 def ask_weight(title, prompt):
     """Ask for an edge weight, clamped to the allowed range. Return None if cancelled."""
     cost = simpledialog.askinteger(title, prompt)
-    if cost is None:
-        return None
-    return max(MIN_WEIGHT, min(MAX_WEIGHT, cost))
+    return None if cost is None else clamp_weight(cost)
 
 
 class UnsavedChangesDialog(tk.Toplevel):

@@ -12,6 +12,12 @@ python -m socialgraph
 
 O antigo `python SocialGraphGUI.py` continua funcionando.
 
+Testes da camada de modelo:
+
+```powershell
+python -m unittest discover tests
+```
+
 ## Formato de arquivo
 
 Arquivos `.txt` com um comando por linha:

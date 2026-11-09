@@ -7,6 +7,11 @@ from socialgraph.config import FONT_FAMILY, MAX_NAME_LEN, NODE_RADIUS
 _ids = itertools.count()
 
 
+def _display_name(name):
+    """Shorten long names (possible in imported files) so they fit inside the circle."""
+    return name if len(name) <= MAX_NAME_LEN else name[:MAX_NAME_LEN - 1] + "…"
+
+
 class NodeView:
     """A circle with the vertex name centered on it.
 
@@ -22,7 +27,7 @@ class NodeView:
         r = NODE_RADIUS
         self.circle = canvas.create_oval(x - r, y - r, x + r, y + r, width=1.5, tags=self.tag,
                                          fill=theme.node_fill, outline=theme.node_outline)
-        self.label = canvas.create_text(x, y, text=name[:MAX_NAME_LEN], tags=self.tag, fill=theme.node_text,
+        self.label = canvas.create_text(x, y, text=_display_name(name), tags=self.tag, fill=theme.node_text,
                                         font=(FONT_FAMILY, 9, "bold"))
 
     def bind(self, sequence, callback):

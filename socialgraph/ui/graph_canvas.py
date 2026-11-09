@@ -6,6 +6,7 @@ from tkinter import messagebox
 
 from socialgraph.config import MAX_PLACEMENT_TRIES, NODE_RADIUS, PATH_HIGHLIGHT_MS
 from socialgraph.model.digraph import DiGraph
+from socialgraph.model.social_graph import BY_DISTANCE, BY_WEIGHTED_DISTANCE
 from socialgraph.ui.dialogs import ask_weight
 from socialgraph.ui.edge_view import EdgeView
 from socialgraph.ui.node_view import NodeView
@@ -22,10 +23,11 @@ class GraphCanvas(tk.Canvas):
     index 1 the destination (purple) used by edge creation and shortest path.
     """
 
-    def __init__(self, master, theme, on_change):
+    def __init__(self, master, theme, on_change, on_recommend):
         super().__init__(master, bg=theme.canvas_bg, highlightthickness=0)
         self.theme = theme
         self.on_change = on_change
+        self.on_recommend = on_recommend
         self.graph = DiGraph()
         self.nodes = {}
         self.edges = {}
@@ -58,10 +60,16 @@ class GraphCanvas(tk.Canvas):
         self.nodes[name] = view
 
     def add_edge(self, src, dst, cost):
-        self.graph.add_edge(src, dst, cost)
+        """Create src -> dst, or update its weight if it exists. Return False if the model rejects it."""
+        if not self.graph.add_edge(src, dst, cost):
+            return False
+        if (src, dst) in self.edges:
+            self.edges[(src, dst)].set_cost(cost)
+            return True
         view = EdgeView(self, self.nodes[src], self.nodes[dst], cost, self.theme)
         view.bind("<Double-Button-1>", lambda e: self._change_weight(src, dst))
         self.edges[(src, dst)] = view
+        return True
 
     def delete_node(self, name):
         self.graph.remove_vertex(name)
@@ -133,9 +141,12 @@ class GraphCanvas(tk.Canvas):
             self.move_node(name, x, y)
 
     def _show_node_menu(self, event, name):
-        self.toggle_selection(name)
         menu = tk.Menu(self, tearoff=False)
-        menu.add_command(label="Recomendações")
+        rec_menu = tk.Menu(menu, tearoff=False)
+        rec_menu.add_command(label="Por distância", command=lambda: self.on_recommend(BY_DISTANCE, name))
+        rec_menu.add_command(label="Por distância ponderada",
+                             command=lambda: self.on_recommend(BY_WEIGHTED_DISTANCE, name))
+        menu.add_cascade(label="Recomendações", menu=rec_menu)
         menu.add_command(label="Deletar", command=lambda: self._confirm_delete(name))
         menu.tk_popup(event.x_root, event.y_root, 0)
 
@@ -145,7 +156,5 @@ class GraphCanvas(tk.Canvas):
 
     def _change_weight(self, src, dst):
         cost = ask_weight("Mudar peso", "Insira o novo peso:")
-        if cost is not None:
-            self.graph.add_edge(src, dst, cost)
-            self.edges[(src, dst)].set_cost(cost)
+        if cost is not None and self.add_edge(src, dst, cost):
             self.on_change()
