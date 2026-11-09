@@ -167,8 +167,15 @@ class GraphCanvas(tk.Canvas):
             self.on_change()
 
     def _confirm_delete(self, name):
-        if messagebox.askyesno("Deletar vértice", "Tem certeza que deseja deletar %s?" % name):
+        message = "Tem certeza que deseja deletar %s?" % name
+        affected = len(self.graph.adjacent_to(name)) + len(self.graph.incoming_edges(name))
+        if affected == 1:
+            message += "\n1 aresta também será removida."
+        elif affected > 1:
+            message += "\n%d arestas também serão removidas." % affected
+        if messagebox.askyesno("Deletar vértice", message):
             self.delete_node(name)
+            self.on_change()
 
     def _change_weight(self, src, dst):
         cost = ask_weight("Mudar peso", "Insira o novo peso:")
