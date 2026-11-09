@@ -50,6 +50,13 @@ class DiGraph:
         self._adj[src][dst] = cost
         return True
 
+    def remove_edge(self, src, dst):
+        """Remove src -> dst. The vertices are kept. Return False if the edge does not exist."""
+        if not self.has_edge(src, dst):
+            return False
+        del self._adj[src][dst]
+        return True
+
     def remove_vertex(self, vertex):
         """Remove a vertex together with its outgoing and incoming edges."""
         if not self.has_vertex(vertex):

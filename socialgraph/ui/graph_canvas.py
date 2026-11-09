@@ -68,8 +68,13 @@ class GraphCanvas(tk.Canvas):
             return True
         view = EdgeView(self, self.nodes[src], self.nodes[dst], cost, self.theme)
         view.bind("<Double-Button-1>", lambda e: self._change_weight(src, dst))
+        view.bind("<Button-3>", lambda e: self._show_edge_menu(e, src, dst))
         self.edges[(src, dst)] = view
         return True
+
+    def delete_edge(self, src, dst):
+        if self.graph.remove_edge(src, dst):
+            self.edges.pop((src, dst)).delete()
 
     def delete_node(self, name):
         self.graph.remove_vertex(name)
@@ -149,6 +154,17 @@ class GraphCanvas(tk.Canvas):
         menu.add_cascade(label="Recomendações", menu=rec_menu)
         menu.add_command(label="Deletar", command=lambda: self._confirm_delete(name))
         menu.tk_popup(event.x_root, event.y_root, 0)
+
+    def _show_edge_menu(self, event, src, dst):
+        menu = tk.Menu(self, tearoff=False)
+        menu.add_command(label="Alterar peso", command=lambda: self._change_weight(src, dst))
+        menu.add_command(label="Excluir aresta", command=lambda: self._confirm_delete_edge(src, dst))
+        menu.tk_popup(event.x_root, event.y_root, 0)
+
+    def _confirm_delete_edge(self, src, dst):
+        if messagebox.askyesno("Excluir aresta", "Tem certeza que deseja excluir a aresta %s → %s?" % (src, dst)):
+            self.delete_edge(src, dst)
+            self.on_change()
 
     def _confirm_delete(self, name):
         if messagebox.askyesno("Deletar vértice", "Tem certeza que deseja deletar %s?" % name):
